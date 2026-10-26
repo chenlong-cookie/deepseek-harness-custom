@@ -62,6 +62,19 @@ function linkDirectory(source: string, destination: string): void {
   symlinkSync(realpathSync(source), destination, process.platform === 'win32' ? 'junction' : 'dir')
 }
 
+/** Mirror installed hoisted packages, omitting dangling optional-platform links. */
+function mirrorDependencyLink(source: string, destination: string): void {
+  let target: string
+  try {
+    target = realpathSync(source)
+  } catch (error) {
+    // pnpm can retain links for optional packages not installed on this platform.
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT' && lstatSync(source).isSymbolicLink()) return
+    throw error
+  }
+  linkDirectory(target, destination)
+}
+
 function mirrorDependencyLinks(sourceRoot: string, destinationRoot: string): void {
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
     if (entry.name === '.bin') continue
@@ -70,16 +83,17 @@ function mirrorDependencyLinks(sourceRoot: string, destinationRoot: string): voi
       mkdirSync(join(destinationRoot, entry.name), { recursive: true })
       for (const scoped of readdirSync(source, { withFileTypes: true })) {
         if (!scoped.isDirectory() && !scoped.isSymbolicLink()) continue
-        linkDirectory(join(source, scoped.name), join(destinationRoot, entry.name, scoped.name))
+        mirrorDependencyLink(join(source, scoped.name), join(destinationRoot, entry.name, scoped.name))
       }
       continue
     }
-    if (entry.isDirectory() || entry.isSymbolicLink()) linkDirectory(source, join(destinationRoot, entry.name))
+    if (entry.isDirectory() || entry.isSymbolicLink()) mirrorDependencyLink(source, join(destinationRoot, entry.name))
   }
 }
 
 /**
  * Replace one disposable project with links to the current built workspace.
+ * Dangling hoisted dependency links are omitted; required CLI and Host artifacts are validated.
  * @param options - Project destination, CLI package, and release identity.
  * @returns the absolute project directory supplied by the caller.
  */

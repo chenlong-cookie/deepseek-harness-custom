@@ -6,6 +6,10 @@
 - id: webserver
   disabled: true
 
+# The HTTP gateway requires the network listener disabled above.
+- id: openai-api
+  disabled: true
+
 - id: web-runtime
   disabled: true
 

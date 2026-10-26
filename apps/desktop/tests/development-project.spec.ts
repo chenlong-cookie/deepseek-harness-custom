@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -29,7 +29,7 @@ afterEach(() => {
 })
 
 describe('desktop development project', () => {
-  it('projects the built dsh and Desktop Host applications with their dependency graph', () => {
+  it.each([false, true])('projects installed dependencies with dangling platform links: %s', (dangling) => {
     const root = temporaryRoot()
     const cli = join(root, 'apps', 'cli')
     const host = join(root, 'apps', 'desktop-host')
@@ -46,6 +46,11 @@ describe('desktop development project', () => {
     writeFileSync(join(dependencies, 'plain-dependency', 'package.json'), '{}\n')
     mkdirSync(join(dependencies, '@scope', 'dependency'))
     writeFileSync(join(dependencies, '@scope', 'dependency', 'package.json'), '{}\n')
+    if (dangling) {
+      const linkType = process.platform === 'win32' ? 'junction' : 'dir'
+      symlinkSync(join(root, 'absent-scoped-package'), join(dependencies, '@scope', 'absent'), linkType)
+      symlinkSync(join(root, 'absent-plain-package'), join(dependencies, 'absent'), linkType)
+    }
 
     const project = prepareDevelopmentProject({
       projectDir: join(root, 'development'),
@@ -65,6 +70,8 @@ describe('desktop development project', () => {
     }
     expect(manifest.dependencies['@deepseek-ai/dsh']).toBe('1.2.3')
     expect(manifest.dependencies['@deepseek-ai/dsh-desktop-host']).toBe('1.2.3')
+    expect(lstatSync(join(project, 'node_modules', '@scope', 'absent'), { throwIfNoEntry: false })).toBeUndefined()
+    expect(lstatSync(join(project, 'node_modules', 'absent'), { throwIfNoEntry: false })).toBeUndefined()
   })
 
   it('rejects a CLI package from another release', () => {

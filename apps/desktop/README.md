@@ -45,6 +45,10 @@ Package transactions hold `$DSH_HOME/profiles/desktop/lock` exclusively through 
 
 ## Develop
 
+Desktop disables the OpenAI-compatible HTTP gateway together with the Web listener. Use `pnpm dsh web` when another service needs the `/v1` HTTP endpoints.
+
+The development launcher mirrors installed workspace dependencies and skips dangling pnpm links for uninstalled platform-specific optional packages. Required CLI and Desktop Host artifacts are still checked before launch.
+
 `dev:desktop` builds the current Host, client bundles, Web frontend, and Electron shell, projects the built CLI and private Desktop Host packages with their workspace dependencies into a disposable desktop npm project, and launches Electron without downloading the packaged Node.js runtime or resolving dsh from npm:
 
 ```sh
